@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { r2, R2_BUCKET } from "@/lib/r2";
+
+import { createSupabaseServerClient } from "../../../../lib/supabase-server";
+import { r2, R2_BUCKET } from "../../../../lib/r2";
 
 export async function POST(request: Request) {
   try {
@@ -13,13 +14,15 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { error: "You must be logged in." },
+        { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
     const body = await request.json();
-    const fileId = String(body.fileId || "").trim();
+
+    const fileId = body.fileId;
+    const permanent = body.permanent === true;
 
     if (!fileId) {
       return NextResponse.json(
@@ -28,13 +31,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Make sure this file belongs to the logged-in user.
     const { data: file, error: fileError } = await supabase
       .from("files")
-      .select("id, storage_key, size_bytes")
+      .select(
+        "id, name, storage_key, size_bytes, is_deleted"
+      )
       .eq("id", fileId)
       .eq("user_id", user.id)
-      .eq("is_deleted", false)
       .single();
 
     if (fileError || !file) {
@@ -44,7 +47,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // Delete the actual object from Cloudflare R2.
+    // Move to Trash
+    if (!permanent) {
+      const { error } = await supabase
+        .from("files")
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+        })
+        .eq("id", fileId)
+        .eq("user_id", user.id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "File moved to Trash.",
+      });
+    }
+
+    // Permanently delete the R2 object
     await r2.send(
       new DeleteObjectCommand({
         Bucket: R2_BUCKET,
@@ -52,29 +76,18 @@ export async function POST(request: Request) {
       })
     );
 
-    // Mark the database record as deleted.
-    const { error: updateError } = await supabase
+    // Delete database record
+    const { error: deleteError } = await supabase
       .from("files")
-      .update({ is_deleted: true })
-      .eq("id", file.id)
+      .delete()
+      .eq("id", fileId)
       .eq("user_id", user.id);
 
-    if (updateError) {
-      console.error(
-        "File database update error:",
-        updateError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "File was removed from storage, but database cleanup failed.",
-        },
-        { status: 500 }
-      );
+    if (deleteError) {
+      throw new Error(deleteError.message);
     }
 
-    // Release the storage quota.
+    // Release storage quota
     const { error: releaseError } = await supabase.rpc(
       "release_storage",
       {
@@ -91,13 +104,18 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "File deleted successfully.",
+      message: "File permanently deleted.",
     });
   } catch (error) {
-    console.error("Delete file error:", error);
+    console.error("Delete API error:", error);
 
     return NextResponse.json(
-      { error: "Unable to delete file." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to delete file.",
+      },
       { status: 500 }
     );
   }
