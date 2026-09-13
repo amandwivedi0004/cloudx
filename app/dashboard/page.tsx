@@ -283,6 +283,17 @@ export default function Dashboard() {
           continue;
         }
 
+        const {
+          data: { user },
+        } =
+          await supabase.auth.getUser();
+
+        if (!user) {
+          throw new Error(
+            "You are not logged in."
+          );
+        }
+
         const response =
           await fetch(
             "/api/files/upload-url",
@@ -305,6 +316,8 @@ export default function Dashboard() {
           uploadUrl?: string;
           signedUrl?: string;
           key?: string;
+          storageKey?: string;
+          storage_key?: string;
           error?: string;
         };
 
@@ -325,9 +338,13 @@ export default function Dashboard() {
         }
 
         /*
-         * IMPORTANT:
-         * Support the upload URL names used by
-         * different versions of the API.
+         * Get the signed upload URL.
+         *
+         * The current API returns:
+         * {
+         *   uploadUrl: "...",
+         *   storageKey: "..."
+         * }
          */
 
         const uploadUrl =
@@ -368,25 +385,28 @@ export default function Dashboard() {
         }
 
         /*
-         * Save the file metadata in Supabase.
+         * The API returns storageKey.
          */
 
-        const {
-          data: { user },
-        } =
-          await supabase.auth.getUser();
+        const storageKey =
+          data.storageKey ||
+          data.key ||
+          data.storage_key;
 
-        if (!user) {
-          throw new Error(
-            "You are not logged in."
+        if (!storageKey) {
+          console.error(
+            "Storage key response:",
+            data
           );
-        }
 
-        if (!data.key) {
           throw new Error(
             "Storage key was not returned by the server."
           );
         }
+
+        /*
+         * Save the file metadata in Supabase.
+         */
 
         const {
           error: dbError,
@@ -395,7 +415,7 @@ export default function Dashboard() {
           .insert({
             user_id: user.id,
             name: file.name,
-            storage_key: data.key,
+            storage_key: storageKey,
             size_bytes: file.size,
             mime_type:
               file.type ||
@@ -1246,6 +1266,7 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen p-4 md:p-6">
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-[1500px] gap-5">
+
         {/* SIDEBAR */}
 
         <aside className="hidden w-[250px] shrink-0 rounded-[30px] border border-white/60 bg-white/60 p-5 shadow-2xl backdrop-blur-xl md:flex md:flex-col">
@@ -1372,6 +1393,7 @@ export default function Dashboard() {
         {/* MAIN */}
 
         <section className="min-w-0 flex-1">
+
           {/* HEADER */}
 
           <header className="mb-5 rounded-[30px] border border-white/60 bg-white/55 p-5 shadow-xl backdrop-blur-xl md:p-6">
@@ -1758,6 +1780,7 @@ export default function Dashboard() {
                           : "border-white/60 bg-white/60"
                       }`}
                     >
+
                       {/* SELECT */}
 
                       <button
@@ -1894,6 +1917,7 @@ export default function Dashboard() {
                         {menuId ===
                           file.id && (
                           <div className="absolute bottom-11 right-0 z-50 w-48 rounded-2xl border border-white/80 bg-white p-2 shadow-2xl">
+
                             {previewable && (
                               <MenuButton
                                 icon={
