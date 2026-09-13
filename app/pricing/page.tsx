@@ -64,6 +64,7 @@ export default function PricingPage() {
   const [subscriptionStatus, setSubscriptionStatus] = useState("");
   const [renewalDate, setRenewalDate] = useState("");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [message, setMessage] = useState("");
   const [userEmail, setUserEmail] = useState("");
 
@@ -113,10 +114,10 @@ export default function PricingPage() {
 
         if (bytes >= 1099511627776) {
           setCurrentStorage("1 TB");
-        } else if (bytes >= 107374182400) {
-          setCurrentStorage("100 GB");
         } else if (bytes >= 214748364800) {
           setCurrentStorage("200 GB");
+        } else if (bytes >= 107374182400) {
+          setCurrentStorage("100 GB");
         } else if (bytes >= 32212254720) {
           setCurrentStorage("30 GB");
         } else {
@@ -260,10 +261,6 @@ export default function PricingPage() {
 
             setCurrentPlan(planId);
 
-            const selectedPlan = plans.find(
-              (plan) => plan.id === planId
-            );
-
             if (selectedPlan) {
               setCurrentStorage(selectedPlan.storage);
             }
@@ -337,9 +334,63 @@ export default function PricingPage() {
     }
   }
 
+  async function cancelSubscription() {
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel your subscription? Your current plan will remain active until the end of the current billing period."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setCancelling(true);
+      setMessage("");
+
+      const response = await fetch(
+        "/api/billing/cancel-subscription",
+        {
+          method: "POST",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Unable to cancel subscription."
+        );
+      }
+
+      setMessage(
+        "Your subscription has been cancelled. Your current plan will remain active until the end of the billing period."
+      );
+
+      await loadUser();
+    } catch (error) {
+      console.error(
+        "Cancel subscription error:",
+        error
+      );
+
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to cancel subscription."
+      );
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   const currentPlanDetails =
     plans.find((plan) => plan.id === currentPlan) ||
     plans[0];
+
+  const hasPaidSubscription =
+    currentPlan !== "free" &&
+    Boolean(renewalDate);
 
   return (
     <>
@@ -431,6 +482,40 @@ export default function PricingPage() {
 
               </div>
             </div>
+
+            {/* CANCEL SUBSCRIPTION */}
+
+            {hasPaidSubscription &&
+              subscriptionStatus !== "cancelled" &&
+              subscriptionStatus !== "completed" && (
+                <div className="mt-6 border-t border-slate-100 pt-6">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Manage subscription
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        Canceling keeps your current
+                        storage active until the renewal
+                        date.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={cancelSubscription}
+                      disabled={cancelling}
+                      className="rounded-xl border border-red-200 bg-white px-5 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {cancelling
+                        ? "Cancelling..."
+                        : "Cancel Subscription"}
+                    </button>
+
+                  </div>
+                </div>
+              )}
           </div>
 
           {/* MESSAGE */}
