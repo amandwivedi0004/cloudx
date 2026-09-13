@@ -33,7 +33,7 @@ export async function POST() {
       await supabaseAdmin
         .from("profiles")
         .select(
-          "subscription_id, subscription_status, subscription_current_period_end"
+          "subscription_id, subscription_status, subscription_current_period_end, subscription_cancel_at_period_end"
         )
         .eq("id", user.id)
         .single();
@@ -50,6 +50,16 @@ export async function POST() {
     if (!profile?.subscription_id) {
       return NextResponse.json(
         { error: "You do not have an active subscription." },
+        { status: 400 }
+      );
+    }
+
+    if (profile.subscription_cancel_at_period_end) {
+      return NextResponse.json(
+        {
+          error:
+            "Your subscription is already scheduled for cancellation.",
+        },
         { status: 400 }
       );
     }
@@ -86,8 +96,9 @@ export async function POST() {
       await supabaseAdmin
         .from("profiles")
         .update({
+          subscription_cancel_at_period_end: true,
           subscription_status:
-            subscription.status || "cancelled",
+            subscription.status || "active",
           subscription_current_period_end: currentEnd,
         })
         .eq("id", user.id);
@@ -110,8 +121,9 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       status:
-        subscription.status || "cancelled",
+        subscription.status || "active",
       currentPeriodEnd: currentEnd,
+      cancelAtPeriodEnd: true,
       message:
         "Your subscription will end at the end of the current billing period.",
     });
