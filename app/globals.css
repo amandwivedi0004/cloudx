@@ -1,2 +1,432 @@
 @import "tailwindcss";
 :root{--bg:#f7f8fc;--line:#e8eaf0;--accent:#4f46e5}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif}button,input{font:inherit}.card{background:#fff;border:1px solid var(--line);border-radius:18px}.upload{border:2px dashed #d9dbe5;transition:.2s}.upload:hover{border-color:var(--accent);background:#fafaff}
+/* =========================================================
+   CLOUDX PREMIUM 3D DASHBOARD
+   Visual layer only — does not affect app functionality
+   ========================================================= */
+
+:root {
+  --cloudx-bg: #f5f7ff;
+  --cloudx-card: rgba(255, 255, 255, 0.78);
+  --cloudx-border: rgba(99, 102, 241, 0.12);
+  --cloudx-shadow:
+    0 20px 45px rgba(15, 23, 42, 0.08),
+    0 4px 12px rgba(79, 70, 229, 0.06);
+}
+
+/* Main page atmosphere */
+
+body {
+  background:
+    radial-gradient(
+      circle at 10% 10%,
+      rgba(99, 102, 241, 0.10),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 90% 15%,
+      rgba(129, 140, 248, 0.10),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 70% 90%,
+      rgba(79, 70, 229, 0.07),
+      transparent 30%
+    ),
+    #f5f7ff;
+}
+
+/* Soft floating light */
+
+body::before {
+  content: "";
+  position: fixed;
+  width: 420px;
+  height: 420px;
+  top: -180px;
+  right: -120px;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle,
+      rgba(129, 140, 248, 0.18),
+      transparent 70%
+    );
+  filter: blur(20px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* =========================================================
+   GLASS CARDS
+   ========================================================= */
+
+.card {
+  position: relative;
+  background: var(--cloudx-card);
+  border: 1px solid var(--cloudx-border);
+  border-radius: 20px;
+
+  box-shadow: var(--cloudx-shadow);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  transform: translateZ(0);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.card:hover {
+  transform:
+    translateY(-3px)
+    perspective(1000px)
+    rotateX(0.5deg);
+
+  box-shadow:
+    0 28px 60px rgba(15, 23, 42, 0.11),
+    0 8px 20px rgba(79, 70, 229, 0.09);
+
+  border-color:
+    rgba(99, 102, 241, 0.20);
+}
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+aside {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.90),
+      rgba(248, 250, 255, 0.78)
+    ) !important;
+
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+
+  box-shadow:
+    12px 0 40px rgba(15, 23, 42, 0.05);
+}
+
+/* CloudX logo depth */
+
+aside .bg-indigo-600 {
+  box-shadow:
+    0 10px 20px rgba(79, 70, 229, 0.25),
+    inset 0 1px 1px rgba(255, 255, 255, 0.35);
+
+  transform:
+    perspective(500px)
+    rotateX(5deg);
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+aside .bg-indigo-600:hover {
+  transform:
+    perspective(500px)
+    rotateX(0deg)
+    translateY(-2px);
+
+  box-shadow:
+    0 16px 30px rgba(79, 70, 229, 0.30),
+    inset 0 1px 1px rgba(255, 255, 255, 0.40);
+}
+
+/* =========================================================
+   UPLOAD BUTTON
+   ========================================================= */
+
+button.bg-indigo-600 {
+  position: relative;
+  overflow: hidden;
+
+  box-shadow:
+    0 10px 22px rgba(79, 70, 229, 0.22),
+    inset 0 1px 1px rgba(255, 255, 255, 0.22);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+button.bg-indigo-600:hover {
+  transform:
+    translateY(-2px)
+    scale(1.01);
+
+  box-shadow:
+    0 16px 30px rgba(79, 70, 229, 0.28),
+    inset 0 1px 1px rgba(255, 255, 255, 0.28);
+}
+
+button.bg-indigo-600:active {
+  transform:
+    translateY(1px)
+    scale(0.99);
+}
+
+/* Light sweep */
+
+button.bg-indigo-600::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 80%;
+  height: 100%;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.20),
+      transparent
+    );
+
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+}
+
+button.bg-indigo-600:hover::after {
+  left: 140%;
+}
+
+/* =========================================================
+   UPLOAD DROP AREA
+   ========================================================= */
+
+.upload {
+  position: relative;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.88),
+      rgba(238, 242, 255, 0.70)
+    );
+
+  border: 1.5px dashed
+    rgba(99, 102, 241, 0.30);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.90),
+    0 18px 40px rgba(79, 70, 229, 0.06);
+
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.upload:hover {
+  transform:
+    translateY(-4px)
+    perspective(900px)
+    rotateX(1deg);
+
+  border-color:
+    rgba(99, 102, 241, 0.55);
+
+  box-shadow:
+    0 25px 55px rgba(79, 70, 229, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+/* =========================================================
+   STORAGE PROGRESS
+   ========================================================= */
+
+.card .bg-indigo-600.rounded-full {
+  box-shadow:
+    0 2px 10px rgba(79, 70, 229, 0.30);
+  transition: width 0.6s ease;
+}
+
+/* =========================================================
+   FILE ROWS
+   ========================================================= */
+
+section.card > div.border-b {
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+section.card > div.border-b:hover {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(238, 242, 255, 0.60),
+      rgba(255, 255, 255, 0.20)
+    );
+}
+
+/* File icons get depth */
+
+section.card .w-10.h-10 {
+  box-shadow:
+    0 5px 12px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+section.card > div:hover .w-10.h-10 {
+  transform:
+    translateY(-2px)
+    rotate(-2deg);
+
+  box-shadow:
+    0 9px 18px rgba(15, 23, 42, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* =========================================================
+   SEARCH
+   ========================================================= */
+
+input[placeholder="Search files"] {
+  background:
+    rgba(255, 255, 255, 0.80) !important;
+
+  border-color:
+    rgba(99, 102, 241, 0.12);
+
+  box-shadow:
+    0 8px 20px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.90);
+
+  backdrop-filter: blur(12px);
+
+  transition:
+    width 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+input[placeholder="Search files"]:focus {
+  width: 280px;
+
+  border-color:
+    rgba(99, 102, 241, 0.35);
+
+  box-shadow:
+    0 12px 30px rgba(79, 70, 229, 0.10),
+    0 0 0 4px rgba(99, 102, 241, 0.08);
+}
+
+/* =========================================================
+   SIDEBAR NAV
+   ========================================================= */
+
+aside nav button {
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+aside nav button:hover {
+  transform:
+    translateX(3px);
+}
+
+aside nav button.bg-indigo-50 {
+  box-shadow:
+    inset 3px 0 0 #6366f1,
+    0 6px 15px rgba(79, 70, 229, 0.07);
+}
+
+/* =========================================================
+   AI CARD
+   ========================================================= */
+
+.bg-indigo-600.text-white {
+  box-shadow:
+    0 20px 45px rgba(79, 70, 229, 0.20),
+    inset 0 1px 1px rgba(255, 255, 255, 0.18);
+
+  position: relative;
+  overflow: hidden;
+}
+
+.bg-indigo-600.text-white::before {
+  content: "";
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  right: -80px;
+  top: -100px;
+  border-radius: 50%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.18),
+      transparent 70%
+    );
+
+  pointer-events: none;
+}
+
+/* =========================================================
+   MODAL
+   ========================================================= */
+
+.fixed.inset-0 > div {
+  box-shadow:
+    0 35px 80px rgba(15, 23, 42, 0.25),
+    0 8px 25px rgba(15, 23, 42, 0.12);
+
+  backdrop-filter: blur(20px);
+}
+
+/* =========================================================
+   SMOOTH MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: no-preference) {
+  .card,
+  .upload,
+  button,
+  aside nav button {
+    will-change: transform;
+  }
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 768px) {
+  body {
+    background:
+      radial-gradient(
+        circle at 50% 0%,
+        rgba(99, 102, 241, 0.10),
+        transparent 35%
+      ),
+      #f5f7ff;
+  }
+
+  input[placeholder="Search files"] {
+    width: 100%;
+  }
+
+  input[placeholder="Search files"]:focus {
+    width: 100%;
+  }
+
+  .card:hover {
+    transform: none;
+  }
+}
