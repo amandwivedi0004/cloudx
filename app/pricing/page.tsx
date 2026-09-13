@@ -59,17 +59,13 @@ const plans: Plan[] = [
 ];
 
 export default function PricingPage() {
-  const [currentPlan, setCurrentPlan] =
-    useState("free");
-
-  const [loadingPlan, setLoadingPlan] =
-    useState<string | null>(null);
-
-  const [message, setMessage] =
-    useState("");
-
-  const [userEmail, setUserEmail] =
-    useState("");
+  const [currentPlan, setCurrentPlan] = useState("free");
+  const [currentStorage, setCurrentStorage] = useState("10 GB");
+  const [subscriptionStatus, setSubscriptionStatus] = useState("");
+  const [renewalDate, setRenewalDate] = useState("");
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
     loadUser();
@@ -87,35 +83,68 @@ export default function PricingPage() {
 
       setUserEmail(user.email || "");
 
-      const { data, error } =
-        await supabase
-          .from("profiles")
-          .select("plan_id")
-          .eq("id", user.id)
-          .single();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(
+          "plan_id, storage_limit_bytes, subscription_status, subscription_current_period_end"
+        )
+        .eq("id", user.id)
+        .single();
 
       if (error) {
-        console.error(
-          "Profile error:",
-          error
-        );
+        console.error("Profile error:", error);
         return;
       }
 
       if (data?.plan_id) {
         setCurrentPlan(data.plan_id);
+
+        const matchedPlan = plans.find(
+          (plan) => plan.id === data.plan_id
+        );
+
+        if (matchedPlan) {
+          setCurrentStorage(matchedPlan.storage);
+        }
+      }
+
+      if (data?.storage_limit_bytes) {
+        const bytes = Number(data.storage_limit_bytes);
+
+        if (bytes >= 1099511627776) {
+          setCurrentStorage("1 TB");
+        } else if (bytes >= 107374182400) {
+          setCurrentStorage("100 GB");
+        } else if (bytes >= 214748364800) {
+          setCurrentStorage("200 GB");
+        } else if (bytes >= 32212254720) {
+          setCurrentStorage("30 GB");
+        } else {
+          setCurrentStorage("10 GB");
+        }
+      }
+
+      if (data?.subscription_status) {
+        setSubscriptionStatus(data.subscription_status);
+      }
+
+      if (data?.subscription_current_period_end) {
+        setRenewalDate(
+          new Date(
+            data.subscription_current_period_end
+          ).toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })
+        );
       }
     } catch (error) {
-      console.error(
-        "Load user error:",
-        error
-      );
+      console.error("Load user error:", error);
     }
   }
 
-  async function subscribe(
-    planId: string
-  ) {
+  async function subscribe(planId: string) {
     try {
       setMessage("");
 
@@ -131,36 +160,35 @@ export default function PricingPage() {
       }
 
       if (planId === "free") {
-        setMessage(
-          "You are already using the Free plan."
-        );
+        setMessage("You are already using the Free plan.");
+        return;
+      }
+
+      if (planId === currentPlan) {
+        setMessage("This is already your current plan.");
         return;
       }
 
       setLoadingPlan(planId);
 
-      const response =
-        await fetch(
-          "/api/billing/create-subscription",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              planId,
-            }),
-          }
-        );
+      const response = await fetch(
+        "/api/billing/create-subscription",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            planId,
+          }),
+        }
+      );
 
-      const data =
-        await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
-            "Unable to create subscription."
+          data.error || "Unable to create subscription."
         );
       }
 
@@ -170,17 +198,14 @@ export default function PricingPage() {
         );
       }
 
-      const selectedPlan =
-        plans.find(
-          (plan) =>
-            plan.id === planId
-        );
+      const selectedPlan = plans.find(
+        (plan) => plan.id === planId
+      );
 
       const razorpayOptions = {
         key: data.razorpayKeyId,
 
-        subscription_id:
-          data.subscriptionId,
+        subscription_id: data.subscriptionId,
 
         name: "CloudX",
 
@@ -189,111 +214,105 @@ export default function PricingPage() {
           `${selectedPlan?.storage || ""}`,
 
         prefill: {
-          name: user.user_metadata
-            ?.full_name || "",
-          email:
-            user.email || userEmail,
+          name: user.user_metadata?.full_name || "",
+          email: user.email || userEmail,
         },
 
         theme: {
           color: "#4f46e5",
         },
 
-        handler:
-          async function (
-            paymentResponse: any
-          ) {
-            try {
-              setMessage(
-                "Verifying your payment..."
-              );
+        handler: async function (paymentResponse: any) {
+          try {
+            setMessage("Verifying your payment...");
 
-              const verifyResponse =
-                await fetch(
-                  "/api/billing/verify",
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type":
-                        "application/json",
-                    },
-                    body: JSON.stringify({
-                      planId,
+            const verifyResponse = await fetch(
+              "/api/billing/verify",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  planId,
 
-                      razorpay_payment_id:
-                        paymentResponse.razorpay_payment_id,
+                  razorpay_payment_id:
+                    paymentResponse.razorpay_payment_id,
 
-                      razorpay_subscription_id:
-                        paymentResponse.razorpay_subscription_id,
+                  razorpay_subscription_id:
+                    paymentResponse.razorpay_subscription_id,
 
-                      razorpay_signature:
-                        paymentResponse.razorpay_signature,
-                    }),
-                  }
-                );
-
-              const verifyData =
-                await verifyResponse.json();
-
-              if (
-                !verifyResponse.ok
-              ) {
-                throw new Error(
-                  verifyData.error ||
-                    "Payment verification failed."
-                );
+                  razorpay_signature:
+                    paymentResponse.razorpay_signature,
+                }),
               }
+            );
 
-              setCurrentPlan(planId);
+            const verifyData =
+              await verifyResponse.json();
 
-              setMessage(
-                "Payment successful! Your CloudX storage has been upgraded."
-              );
-
-              await loadUser();
-            } catch (error) {
-              console.error(
-                "Verification error:",
-                error
-              );
-
-              setMessage(
-                error instanceof Error
-                  ? error.message
-                  : "Payment verification failed."
+            if (!verifyResponse.ok) {
+              throw new Error(
+                verifyData.error ||
+                  "Payment verification failed."
               );
             }
-          },
+
+            setCurrentPlan(planId);
+
+            const selectedPlan = plans.find(
+              (plan) => plan.id === planId
+            );
+
+            if (selectedPlan) {
+              setCurrentStorage(selectedPlan.storage);
+            }
+
+            setSubscriptionStatus("active");
+
+            setMessage(
+              "Payment successful! Your CloudX storage has been upgraded."
+            );
+
+            await loadUser();
+          } catch (error) {
+            console.error(
+              "Verification error:",
+              error
+            );
+
+            setMessage(
+              error instanceof Error
+                ? error.message
+                : "Payment verification failed."
+            );
+          } finally {
+            setLoadingPlan(null);
+          }
+        },
 
         modal: {
-          ondismiss:
-            function () {
-              setLoadingPlan(null);
-              setMessage(
-                "Payment window closed."
-              );
-            },
+          ondismiss: function () {
+            setLoadingPlan(null);
+            setMessage("Payment window closed.");
+          },
         },
       };
 
-      const razorpay =
-        new window.Razorpay(
-          razorpayOptions
-        );
+      const razorpay = new window.Razorpay(
+        razorpayOptions
+      );
 
       razorpay.on(
         "payment.failed",
-        function (
-          response: any
-        ) {
+        function (response: any) {
           console.error(
             "Razorpay payment failed:",
             response
           );
 
           setMessage(
-            response?.error
-              ?.description ||
+            response?.error?.description ||
               "Payment failed. Please try again."
           );
 
@@ -318,6 +337,10 @@ export default function PricingPage() {
     }
   }
 
+  const currentPlanDetails =
+    plans.find((plan) => plan.id === currentPlan) ||
+    plans[0];
+
   return (
     <>
       <Script
@@ -326,17 +349,14 @@ export default function PricingPage() {
       />
 
       <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 px-5 py-10 md:px-8">
-
         <div className="mx-auto max-w-7xl">
 
           {/* HEADER */}
 
-          <div className="mb-10 text-center">
-
+          <div className="mb-8 text-center">
             <button
               onClick={() =>
-                (window.location.href =
-                  "/dashboard")
+                (window.location.href = "/dashboard")
               }
               className="mb-6 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
             >
@@ -344,15 +364,73 @@ export default function PricingPage() {
             </button>
 
             <h1 className="text-4xl font-bold tracking-tight text-slate-900 md:text-5xl">
-              Choose your CloudX plan
+              Plans & Billing
             </h1>
 
             <p className="mx-auto mt-4 max-w-2xl text-slate-500">
-              Get more private cloud storage
-              for your files, photos and
-              documents.
+              Manage your CloudX storage plan and
+              subscription.
             </p>
+          </div>
 
+          {/* CURRENT PLAN */}
+
+          <div className="mx-auto mb-10 max-w-4xl rounded-3xl border border-indigo-100 bg-white p-6 shadow-lg">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
+                  Current Plan
+                </p>
+
+                <h2 className="mt-1 text-2xl font-bold text-slate-900">
+                  {currentPlanDetails.name}
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  {currentPlanDetails.description}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+
+                <div className="rounded-2xl bg-slate-50 px-5 py-4">
+                  <p className="text-xs text-slate-500">
+                    Storage
+                  </p>
+
+                  <p className="mt-1 font-bold text-slate-900">
+                    {currentStorage}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 px-5 py-4">
+                  <p className="text-xs text-slate-500">
+                    Status
+                  </p>
+
+                  <p className="mt-1 font-bold capitalize text-slate-900">
+                    {subscriptionStatus || "Active"}
+                  </p>
+                </div>
+
+                <div className="col-span-2 rounded-2xl bg-slate-50 px-5 py-4 md:col-span-1">
+                  <p className="text-xs text-slate-500">
+                    {renewalDate
+                      ? "Renewal"
+                      : "Billing"}
+                  </p>
+
+                  <p className="mt-1 font-bold text-slate-900">
+                    {renewalDate ||
+                      (currentPlan === "free"
+                        ? "Free"
+                        : "Yearly")}
+                  </p>
+                </div>
+
+              </div>
+            </div>
           </div>
 
           {/* MESSAGE */}
@@ -365,126 +443,113 @@ export default function PricingPage() {
 
           {/* PLANS */}
 
+          <div className="mb-4 text-center">
+            <h2 className="text-2xl font-bold text-slate-900">
+              Choose your CloudX plan
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Upgrade whenever you need more storage.
+            </p>
+          </div>
+
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
 
-            {plans.map(
-              (plan) => {
-                const isCurrent =
-                  currentPlan ===
-                  plan.id;
+            {plans.map((plan) => {
+              const isCurrent =
+                currentPlan === plan.id;
 
-                const isLoading =
-                  loadingPlan ===
-                  plan.id;
+              const isLoading =
+                loadingPlan === plan.id;
 
-                return (
-                  <div
-                    key={plan.id}
-                    className={`relative flex flex-col rounded-3xl border bg-white p-6 shadow-lg transition hover:-translate-y-1 hover:shadow-xl ${
-                      plan.id ===
-                      "cloudx_100"
-                        ? "border-indigo-300 ring-2 ring-indigo-100"
-                        : "border-slate-200"
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative flex flex-col rounded-3xl border bg-white p-6 shadow-lg transition hover:-translate-y-1 hover:shadow-xl ${
+                    plan.id === "cloudx_100"
+                      ? "border-indigo-300 ring-2 ring-indigo-100"
+                      : "border-slate-200"
+                  }`}
+                >
+
+                  {plan.id === "cloudx_100" && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-4 py-1 text-xs font-bold text-white">
+                      POPULAR
+                    </div>
+                  )}
+
+                  {/* PLAN NAME */}
+
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">
+                      {plan.name}
+                    </h2>
+
+                    <p className="mt-2 min-h-[40px] text-sm text-slate-500">
+                      {plan.description}
+                    </p>
+                  </div>
+
+                  {/* PRICE */}
+
+                  <div className="mt-6">
+                    <span className="text-4xl font-bold text-slate-900">
+                      ₹{plan.price.toLocaleString("en-IN")}
+                    </span>
+
+                    <span className="ml-1 text-sm text-slate-500">
+                      /year
+                    </span>
+                  </div>
+
+                  {/* STORAGE */}
+
+                  <div className="mt-6 rounded-2xl bg-slate-50 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">
+                        Storage
+                      </span>
+
+                      <span className="font-bold text-slate-900">
+                        {plan.storage}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* BUTTON */}
+
+                  <button
+                    onClick={() =>
+                      subscribe(plan.id)
+                    }
+                    disabled={
+                      isCurrent || isLoading
+                    }
+                    className={`mt-6 w-full rounded-2xl px-4 py-3 font-bold transition ${
+                      isCurrent
+                        ? "cursor-default bg-slate-100 text-slate-500"
+                        : "bg-indigo-600 text-white shadow-lg hover:bg-indigo-700"
                     }`}
                   >
+                    {isLoading
+                      ? "Opening payment..."
+                      : isCurrent
+                        ? "Current Plan"
+                        : plan.id === "free"
+                          ? "Free Plan"
+                          : "Upgrade"}
+                  </button>
 
-                    {plan.id ===
-                      "cloudx_100" && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-4 py-1 text-xs font-bold text-white">
-                        POPULAR
-                      </div>
-                    )}
+                  {/* YEARLY */}
 
-                    {/* PLAN NAME */}
-
-                    <div>
-
-                      <h2 className="text-xl font-bold text-slate-900">
-                        {plan.name}
-                      </h2>
-
-                      <p className="mt-2 min-h-[40px] text-sm text-slate-500">
-                        {plan.description}
-                      </p>
-
-                    </div>
-
-                    {/* PRICE */}
-
-                    <div className="mt-6">
-
-                      <span className="text-4xl font-bold text-slate-900">
-                        ₹
-                        {plan.price.toLocaleString(
-                          "en-IN"
-                        )}
-                      </span>
-
-                      <span className="ml-1 text-sm text-slate-500">
-                        /year
-                      </span>
-
-                    </div>
-
-                    {/* STORAGE */}
-
-                    <div className="mt-6 rounded-2xl bg-slate-50 p-4">
-
-                      <div className="flex items-center justify-between">
-
-                        <span className="text-sm text-slate-500">
-                          Storage
-                        </span>
-
-                        <span className="font-bold text-slate-900">
-                          {plan.storage}
-                        </span>
-
-                      </div>
-
-                    </div>
-
-                    {/* BUTTON */}
-
-                    <button
-                      onClick={() =>
-                        subscribe(
-                          plan.id
-                        )
-                      }
-                      disabled={
-                        isCurrent ||
-                        isLoading
-                      }
-                      className={`mt-6 w-full rounded-2xl px-4 py-3 font-bold transition ${
-                        isCurrent
-                          ? "cursor-default bg-slate-100 text-slate-500"
-                          : "bg-indigo-600 text-white shadow-lg hover:bg-indigo-700"
-                      }`}
-                    >
-                      {isLoading
-                        ? "Opening payment..."
-                        : isCurrent
-                          ? "Current Plan"
-                          : plan.id ===
-                              "free"
-                            ? "Free Plan"
-                            : "Upgrade"}
-                    </button>
-
-                    {/* YEARLY */}
-
-                    {plan.price >
-                      0 && (
-                      <p className="mt-3 text-center text-xs text-slate-400">
-                        Billed yearly
-                      </p>
-                    )}
-
-                  </div>
-                );
-              }
-            )}
+                  {plan.price > 0 && (
+                    <p className="mt-3 text-center text-xs text-slate-400">
+                      Billed yearly
+                    </p>
+                  )}
+                </div>
+              );
+            })}
 
           </div>
 
@@ -493,21 +558,18 @@ export default function PricingPage() {
           <div className="mx-auto mt-10 max-w-3xl rounded-3xl border border-white bg-white/70 p-6 text-center shadow-sm backdrop-blur">
 
             <p className="text-sm font-semibold text-slate-800">
-              🔒 Secure payments with
-              Razorpay
+              🔒 Secure payments with Razorpay
             </p>
 
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              Your payment is processed
-              securely by Razorpay. CloudX
-              does not store your card or
-              UPI credentials.
+              Your payment is processed securely by
+              Razorpay. CloudX does not store your
+              card or UPI credentials.
             </p>
 
           </div>
 
         </div>
-
       </main>
     </>
   );
