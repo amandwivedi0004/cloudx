@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowLeft,
   CheckSquare,
   Clock3,
   Cloud,
@@ -16,8 +15,6 @@ import {
   LogOut,
   MoreHorizontal,
   Pencil,
-  Play,
-  RefreshCw,
   RotateCcw,
   Search,
   ShieldCheck,
@@ -61,7 +58,9 @@ const MAX_FILE_SIZE =
   5 * 1024 * 1024 * 1024;
 
 function formatBytes(bytes: number) {
-  if (!bytes || bytes <= 0) return "0 B";
+  if (!bytes || bytes <= 0) {
+    return "0 B";
+  }
 
   const units = [
     "B",
@@ -72,7 +71,9 @@ function formatBytes(bytes: number) {
   ];
 
   const index = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(1024)),
+    Math.floor(
+      Math.log(bytes) / Math.log(1024)
+    ),
     units.length - 1
   );
 
@@ -84,14 +85,17 @@ function formatBytes(bytes: number) {
 }
 
 function getFileIcon(mimeType: string) {
-  if (mimeType.startsWith("image/"))
+  if (mimeType.startsWith("image/")) {
     return ImageIcon;
+  }
 
-  if (mimeType.startsWith("video/"))
+  if (mimeType.startsWith("video/")) {
     return Video;
+  }
 
-  if (mimeType.includes("pdf"))
+  if (mimeType.includes("pdf")) {
     return FileText;
+  }
 
   return FileIcon;
 }
@@ -104,14 +108,14 @@ function isPreviewable(mimeType: string) {
 }
 
 export default function Dashboard() {
-  const [files, setFiles] = useState<FileItem[]>(
-    []
-  );
+  const [files, setFiles] =
+    useState<FileItem[]>([]);
 
   const [section, setSection] =
     useState<Section>("files");
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] =
+    useState("");
 
   const [loading, setLoading] =
     useState(true);
@@ -162,16 +166,18 @@ export default function Dashboard() {
         return;
       }
 
-      const { data: fileData, error: fileError } =
-        await supabase
-          .from("files")
-          .select(
-            "id, name, mime_type, size_bytes, created_at, is_starred, is_deleted"
-          )
-          .eq("user_id", user.id)
-          .order("created_at", {
-            ascending: false,
-          });
+      const {
+        data: fileData,
+        error: fileError,
+      } = await supabase
+        .from("files")
+        .select(
+          "id, name, mime_type, size_bytes, created_at, is_starred, is_deleted"
+        )
+        .eq("user_id", user.id)
+        .order("created_at", {
+          ascending: false,
+        });
 
       if (fileError) {
         throw new Error(
@@ -200,7 +206,9 @@ export default function Dashboard() {
           name: file.name,
           type: file.mime_type || "",
           size: formatBytes(
-            Number(file.size_bytes || 0)
+            Number(
+              file.size_bytes || 0
+            )
           ),
           sizeBytes: Number(
             file.size_bytes || 0
@@ -219,7 +227,8 @@ export default function Dashboard() {
       if (profile) {
         setStorageUsed(
           Number(
-            profile.storage_used_bytes || 0
+            profile.storage_used_bytes ||
+              0
           )
         );
 
@@ -254,11 +263,12 @@ export default function Dashboard() {
   const uploadFiles = async (
     selectedFiles: FileList | File[]
   ) => {
-    const list = Array.from(
-      selectedFiles
-    );
+    const list =
+      Array.from(selectedFiles);
 
-    if (list.length === 0) return;
+    if (list.length === 0) {
+      return;
+    }
 
     try {
       setUploading(true);
@@ -273,24 +283,39 @@ export default function Dashboard() {
           continue;
         }
 
-        const response = await fetch(
-          "/api/files/upload-url",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              name: file.name,
-              size: file.size,
-              mimeType: file.type,
-            }),
-          }
-        );
+        const response =
+          await fetch(
+            "/api/files/upload-url",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                name: file.name,
+                size: file.size,
+                mimeType: file.type,
+              }),
+            }
+          );
 
-        const data =
-          await response.json();
+        let data: {
+          url?: string;
+          uploadUrl?: string;
+          signedUrl?: string;
+          key?: string;
+          error?: string;
+        };
+
+        try {
+          data =
+            await response.json();
+        } catch {
+          throw new Error(
+            "The upload server returned an invalid response."
+          );
+        }
 
         if (!response.ok) {
           throw new Error(
@@ -299,8 +324,34 @@ export default function Dashboard() {
           );
         }
 
+        /*
+         * IMPORTANT:
+         * Support the upload URL names used by
+         * different versions of the API.
+         */
+
+        const uploadUrl =
+          data.uploadUrl ||
+          data.url ||
+          data.signedUrl;
+
+        if (!uploadUrl) {
+          console.error(
+            "Upload URL response:",
+            data
+          );
+
+          throw new Error(
+            "Upload URL was not returned by the server."
+          );
+        }
+
+        /*
+         * Upload directly to Cloudflare R2.
+         */
+
         const uploadResponse =
-          await fetch(data.url, {
+          await fetch(uploadUrl, {
             method: "PUT",
             headers: {
               "Content-Type":
@@ -316,9 +367,14 @@ export default function Dashboard() {
           );
         }
 
+        /*
+         * Save the file metadata in Supabase.
+         */
+
         const {
           data: { user },
-        } = await supabase.auth.getUser();
+        } =
+          await supabase.auth.getUser();
 
         if (!user) {
           throw new Error(
@@ -326,18 +382,25 @@ export default function Dashboard() {
           );
         }
 
-        const { error: dbError } =
-          await supabase
-            .from("files")
-            .insert({
-              user_id: user.id,
-              name: file.name,
-              storage_key: data.key,
-              size_bytes: file.size,
-              mime_type:
-                file.type ||
-                "application/octet-stream",
-            });
+        if (!data.key) {
+          throw new Error(
+            "Storage key was not returned by the server."
+          );
+        }
+
+        const {
+          error: dbError,
+        } = await supabase
+          .from("files")
+          .insert({
+            user_id: user.id,
+            name: file.name,
+            storage_key: data.key,
+            size_bytes: file.size,
+            mime_type:
+              file.type ||
+              "application/octet-stream",
+          });
 
         if (dbError) {
           throw new Error(
@@ -362,7 +425,8 @@ export default function Dashboard() {
       setUploading(false);
 
       if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+        fileInputRef.current.value =
+          "";
       }
     }
   };
@@ -371,7 +435,9 @@ export default function Dashboard() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     if (event.target.files) {
-      uploadFiles(event.target.files);
+      uploadFiles(
+        event.target.files
+      );
     }
   };
 
@@ -395,19 +461,20 @@ export default function Dashboard() {
     file: FileItem
   ) => {
     try {
-      const response = await fetch(
-        "/api/files/download-url",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            fileId: file.id,
-          }),
-        }
-      );
+      const response =
+        await fetch(
+          "/api/files/download-url",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              fileId: file.id,
+            }),
+          }
+        );
 
       const data =
         await response.json();
@@ -420,7 +487,9 @@ export default function Dashboard() {
       }
 
       const url =
-        data.url || data.downloadUrl;
+        data.url ||
+        data.downloadUrl ||
+        data.signedUrl;
 
       if (!url) {
         throw new Error(
@@ -471,19 +540,20 @@ export default function Dashboard() {
     try {
       setMenuId(null);
 
-      const response = await fetch(
-        "/api/files/download-url",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            fileId: file.id,
-          }),
-        }
-      );
+      const response =
+        await fetch(
+          "/api/files/download-url",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              fileId: file.id,
+            }),
+          }
+        );
 
       const data =
         await response.json();
@@ -496,7 +566,9 @@ export default function Dashboard() {
       }
 
       const url =
-        data.url || data.downloadUrl;
+        data.url ||
+        data.downloadUrl ||
+        data.signedUrl;
 
       if (!url) {
         throw new Error(
@@ -580,19 +652,20 @@ export default function Dashboard() {
     file: FileItem
   ) => {
     try {
-      const response = await fetch(
-        "/api/files/delete",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            fileId: file.id,
-          }),
-        }
-      );
+      const response =
+        await fetch(
+          "/api/files/delete",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              fileId: file.id,
+            }),
+          }
+        );
 
       const data =
         await response.json();
@@ -684,78 +757,83 @@ export default function Dashboard() {
   };
 
   /* =========================================================
-     PERMANENT DELETE SINGLE
+     PERMANENT DELETE
   ========================================================= */
 
-  const permanentlyDelete = async (
-    file: FileItem
-  ) => {
-    const confirmed =
-      window.confirm(
-        `Permanently delete "${file.name}"? This cannot be undone.`
-      );
-
-    if (!confirmed) return;
-
-    try {
-      const response = await fetch(
-        "/api/files/delete",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            fileId: file.id,
-            permanent: true,
-          }),
-        }
-      );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            "Unable to permanently delete file."
+  const permanentlyDelete =
+    async (file: FileItem) => {
+      const confirmed =
+        window.confirm(
+          `Permanently delete "${file.name}"? This cannot be undone.`
         );
+
+      if (!confirmed) {
+        return;
       }
 
-      setFiles((current) =>
-        current.filter(
-          (item) => item.id !== file.id
-        )
-      );
+      try {
+        const response =
+          await fetch(
+            "/api/files/delete",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                fileId: file.id,
+                permanent: true,
+              }),
+            }
+          );
 
-      setSelectedIds((current) =>
-        current.filter(
-          (id) => id !== file.id
-        )
-      );
+        const data =
+          await response.json();
 
-      setStorageUsed((current) =>
-        Math.max(
-          current - file.sizeBytes,
-          0
-        )
-      );
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Unable to permanently delete file."
+          );
+        }
 
-      setMenuId(null);
-    } catch (error) {
-      console.error(
-        "Permanent delete error:",
-        error
-      );
+        setFiles((current) =>
+          current.filter(
+            (item) =>
+              item.id !== file.id
+          )
+        );
 
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Unable to permanently delete file."
-      );
-    }
-  };
+        setSelectedIds((current) =>
+          current.filter(
+            (id) => id !== file.id
+          )
+        );
+
+        setStorageUsed(
+          (current) =>
+            Math.max(
+              current -
+                file.sizeBytes,
+              0
+            )
+        );
+
+        setMenuId(null);
+      } catch (error) {
+        console.error(
+          "Permanent delete error:",
+          error
+        );
+
+        alert(
+          error instanceof Error
+            ? error.message
+            : "Unable to permanently delete file."
+        );
+      }
+    };
 
   /* =========================================================
      RENAME
@@ -770,7 +848,9 @@ export default function Dashboard() {
   };
 
   const saveRename = async () => {
-    if (!renameFile) return;
+    if (!renameFile) {
+      return;
+    }
 
     const newName =
       renameValue.trim();
@@ -936,7 +1016,7 @@ export default function Dashboard() {
   };
 
   /* =========================================================
-     FIXED BULK DELETE
+     BULK MOVE TO TRASH
   ========================================================= */
 
   const bulkMoveToTrash =
@@ -959,7 +1039,9 @@ export default function Dashboard() {
           `Move ${selectedFiles.length} file(s) to Trash?`
         );
 
-      if (!confirmed) return;
+      if (!confirmed) {
+        return;
+      }
 
       try {
         const response =
@@ -1024,6 +1106,10 @@ export default function Dashboard() {
       }
     };
 
+  /* =========================================================
+     BULK PERMANENT DELETE
+  ========================================================= */
+
   const bulkPermanentDelete =
     async () => {
       const selectedFiles =
@@ -1044,7 +1130,9 @@ export default function Dashboard() {
           `Permanently delete ${selectedFiles.length} file(s)? This cannot be undone.`
         );
 
-      if (!confirmed) return;
+      if (!confirmed) {
+        return;
+      }
 
       try {
         const response =
@@ -1145,10 +1233,11 @@ export default function Dashboard() {
         )
       : 0;
 
-  const freeStorage = Math.max(
-    storageLimit - storageUsed,
-    0
-  );
+  const freeStorage =
+    Math.max(
+      storageLimit - storageUsed,
+      0
+    );
 
   /* =========================================================
      UI
@@ -1181,7 +1270,9 @@ export default function Dashboard() {
               active={
                 section === "files"
               }
-              icon={<Files size={19} />}
+              icon={
+                <Files size={19} />
+              }
               label="My Files"
               onClick={() => {
                 setSection("files");
@@ -1193,7 +1284,9 @@ export default function Dashboard() {
               active={
                 section === "starred"
               }
-              icon={<Star size={19} />}
+              icon={
+                <Star size={19} />
+              }
               label="Starred"
               onClick={() => {
                 setSection("starred");
@@ -1271,7 +1364,6 @@ export default function Dashboard() {
                 size={17}
                 className="mr-2"
               />
-
               Sign out
             </button>
           </div>
@@ -1552,7 +1644,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* BULK ACTION BAR */}
+          {/* BULK ACTIONS */}
 
           {selectedIds.length >
             0 && (
@@ -1666,7 +1758,7 @@ export default function Dashboard() {
                           : "border-white/60 bg-white/60"
                       }`}
                     >
-                      {/* CHECKBOX */}
+                      {/* SELECT */}
 
                       <button
                         onClick={() =>
@@ -1780,7 +1872,7 @@ export default function Dashboard() {
 
                       {/* MENU */}
 
-                      <div className="relative">
+                      <div className="relative z-40">
                         <button
                           onClick={() =>
                             setMenuId(
@@ -1801,126 +1893,123 @@ export default function Dashboard() {
 
                         {menuId ===
                           file.id && (
-                          <div className="absolute bottom-11 right-0 z-30 w-48 rounded-2xl border border-white/80 bg-white p-2 shadow-2xl">
+                          <div className="absolute bottom-11 right-0 z-50 w-48 rounded-2xl border border-white/80 bg-white p-2 shadow-2xl">
                             {previewable && (
-                              <button
+                              <MenuButton
+                                icon={
+                                  <Eye
+                                    size={17}
+                                  />
+                                }
+                                label="Preview"
                                 onClick={() =>
                                   handlePreview(
                                     file
                                   )
                                 }
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100"
-                              >
-                                <Eye
-                                  size={17}
-                                />
-
-                                Preview
-                              </button>
+                              />
                             )}
 
-                            <button
+                            <MenuButton
+                              icon={
+                                <Download
+                                  size={17}
+                                />
+                              }
+                              label="Download"
                               onClick={() =>
                                 handleDownload(
                                   file
                                 )
                               }
-                              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100"
-                            >
-                              <Download
-                                size={17}
-                              />
-
-                              Download
-                            </button>
+                            />
 
                             {!file.isDeleted && (
-                              <button
+                              <MenuButton
+                                icon={
+                                  <Pencil
+                                    size={17}
+                                  />
+                                }
+                                label="Rename"
                                 onClick={() =>
                                   openRename(
                                     file
                                   )
                                 }
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100"
-                              >
-                                <Pencil
-                                  size={17}
-                                />
-
-                                Rename
-                              </button>
+                              />
                             )}
 
-                            <button
+                            <MenuButton
+                              icon={
+                                <Star
+                                  size={17}
+                                />
+                              }
+                              label={
+                                file.isStarred
+                                  ? "Remove star"
+                                  : "Add to starred"
+                              }
                               onClick={() =>
                                 toggleStar(
                                   file
                                 )
                               }
-                              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100"
-                            >
-                              <Star
-                                size={17}
-                              />
-
-                              {file.isStarred
-                                ? "Remove star"
-                                : "Add to starred"}
-                            </button>
+                            />
 
                             {file.isDeleted ? (
                               <>
-                                <button
+                                <MenuButton
+                                  icon={
+                                    <RotateCcw
+                                      size={
+                                        17
+                                      }
+                                    />
+                                  }
+                                  label="Restore"
                                   onClick={() =>
                                     restoreFile(
                                       file
                                     )
                                   }
-                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100"
-                                >
-                                  <RotateCcw
-                                    size={
-                                      17
-                                    }
-                                  />
+                                />
 
-                                  Restore
-                                </button>
-
-                                <button
+                                <MenuButton
+                                  danger
+                                  icon={
+                                    <Trash2
+                                      size={
+                                        17
+                                      }
+                                    />
+                                  }
+                                  label="Delete permanently"
                                   onClick={() =>
                                     permanentlyDelete(
                                       file
                                     )
                                   }
-                                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-                                >
+                                />
+                              </>
+                            ) : (
+                              <MenuButton
+                                danger
+                                icon={
                                   <Trash2
                                     size={
                                       17
                                     }
                                   />
-
-                                  Delete permanently
-                                </button>
-                              </>
-                            ) : (
-                              <button
+                                }
+                                label="Move to Trash"
                                 onClick={() =>
                                   moveToTrash(
                                     file
                                   )
                                 }
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2
-                                  size={
-                                    17
-                                  }
-                                />
-
-                                Move to Trash
-                              </button>
+                              />
                             )}
                           </div>
                         )}
@@ -1950,33 +2039,20 @@ export default function Dashboard() {
             }
           >
             <div className="flex items-center justify-between gap-4 bg-black/90 px-5 py-4 text-white">
-              <div className="flex min-w-0 items-center gap-3">
-                {previewFile.mimeType.startsWith(
-                  "image/"
-                ) ? (
-                  <ImageIcon
-                    size={20}
-                  />
-                ) : (
-                  <Video size={20} />
-                )}
-
-                <p
-                  className="truncate text-sm font-semibold"
-                  title={
-                    previewFile.name
-                  }
-                >
-                  {previewFile.name}
-                </p>
-              </div>
+              <p
+                className="truncate text-sm font-semibold"
+                title={
+                  previewFile.name
+                }
+              >
+                {previewFile.name}
+              </p>
 
               <button
                 onClick={() =>
                   setPreviewFile(null)
                 }
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 transition hover:bg-white/20"
-                title="Close"
               >
                 <X size={21} />
               </button>
@@ -2100,12 +2176,16 @@ export default function Dashboard() {
           onClick={() =>
             setMenuId(null)
           }
-          className="fixed inset-0 z-20 cursor-default"
+          className="fixed inset-0 z-30 cursor-default"
         />
       )}
     </main>
   );
 }
+
+/* =========================================================
+   NAV BUTTON
+========================================================= */
 
 function NavButton({
   active,
@@ -2132,6 +2212,40 @@ function NavButton({
     </button>
   );
 }
+
+/* =========================================================
+   MENU BUTTON
+========================================================= */
+
+function MenuButton({
+  icon,
+  label,
+  onClick,
+  danger = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium hover:bg-slate-100 ${
+        danger
+          ? "text-red-600 hover:bg-red-50"
+          : "text-slate-700"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+/* =========================================================
+   STAT CARD
+========================================================= */
 
 function StatCard({
   title,
