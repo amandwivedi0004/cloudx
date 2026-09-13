@@ -63,8 +63,12 @@ export default function PricingPage() {
   const [currentStorage, setCurrentStorage] = useState("10 GB");
   const [subscriptionStatus, setSubscriptionStatus] = useState("");
   const [renewalDate, setRenewalDate] = useState("");
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-  const [cancelling, setCancelling] = useState(false);
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] =
+    useState(false);
+  const [loadingPlan, setLoadingPlan] =
+    useState<string | null>(null);
+  const [cancelling, setCancelling] =
+    useState(false);
   const [message, setMessage] = useState("");
   const [userEmail, setUserEmail] = useState("");
 
@@ -87,7 +91,7 @@ export default function PricingPage() {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "plan_id, storage_limit_bytes, subscription_status, subscription_current_period_end"
+          "plan_id, storage_limit_bytes, subscription_status, subscription_current_period_end, subscription_cancel_at_period_end"
         )
         .eq("id", user.id)
         .single();
@@ -128,6 +132,10 @@ export default function PricingPage() {
       if (data?.subscription_status) {
         setSubscriptionStatus(data.subscription_status);
       }
+
+      setCancelAtPeriodEnd(
+        Boolean(data?.subscription_cancel_at_period_end)
+      );
 
       if (data?.subscription_current_period_end) {
         setRenewalDate(
@@ -189,7 +197,8 @@ export default function PricingPage() {
 
       if (!response.ok) {
         throw new Error(
-          data.error || "Unable to create subscription."
+          data.error ||
+            "Unable to create subscription."
         );
       }
 
@@ -215,7 +224,8 @@ export default function PricingPage() {
           `${selectedPlan?.storage || ""}`,
 
         prefill: {
-          name: user.user_metadata?.full_name || "",
+          name:
+            user.user_metadata?.full_name || "",
           email: user.email || userEmail,
         },
 
@@ -223,31 +233,37 @@ export default function PricingPage() {
           color: "#4f46e5",
         },
 
-        handler: async function (paymentResponse: any) {
+        handler: async function (
+          paymentResponse: any
+        ) {
           try {
-            setMessage("Verifying your payment...");
-
-            const verifyResponse = await fetch(
-              "/api/billing/verify",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  planId,
-
-                  razorpay_payment_id:
-                    paymentResponse.razorpay_payment_id,
-
-                  razorpay_subscription_id:
-                    paymentResponse.razorpay_subscription_id,
-
-                  razorpay_signature:
-                    paymentResponse.razorpay_signature,
-                }),
-              }
+            setMessage(
+              "Verifying your payment..."
             );
+
+            const verifyResponse =
+              await fetch(
+                "/api/billing/verify",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                  },
+                  body: JSON.stringify({
+                    planId,
+
+                    razorpay_payment_id:
+                      paymentResponse.razorpay_payment_id,
+
+                    razorpay_subscription_id:
+                      paymentResponse.razorpay_subscription_id,
+
+                    razorpay_signature:
+                      paymentResponse.razorpay_signature,
+                  }),
+                }
+              );
 
             const verifyData =
               await verifyResponse.json();
@@ -262,10 +278,13 @@ export default function PricingPage() {
             setCurrentPlan(planId);
 
             if (selectedPlan) {
-              setCurrentStorage(selectedPlan.storage);
+              setCurrentStorage(
+                selectedPlan.storage
+              );
             }
 
             setSubscriptionStatus("active");
+            setCancelAtPeriodEnd(false);
 
             setMessage(
               "Payment successful! Your CloudX storage has been upgraded."
@@ -291,14 +310,17 @@ export default function PricingPage() {
         modal: {
           ondismiss: function () {
             setLoadingPlan(null);
-            setMessage("Payment window closed.");
+            setMessage(
+              "Payment window closed."
+            );
           },
         },
       };
 
-      const razorpay = new window.Razorpay(
-        razorpayOptions
-      );
+      const razorpay =
+        new window.Razorpay(
+          razorpayOptions
+        );
 
       razorpay.on(
         "payment.failed",
@@ -363,8 +385,10 @@ export default function PricingPage() {
         );
       }
 
+      setCancelAtPeriodEnd(true);
+
       setMessage(
-        "Your subscription has been cancelled. Your current plan will remain active until the end of the billing period."
+        "Cancellation scheduled. Your current plan will remain active until the end of the billing period."
       );
 
       await loadUser();
@@ -385,8 +409,9 @@ export default function PricingPage() {
   }
 
   const currentPlanDetails =
-    plans.find((plan) => plan.id === currentPlan) ||
-    plans[0];
+    plans.find(
+      (plan) => plan.id === currentPlan
+    ) || plans[0];
 
   const hasPaidSubscription =
     currentPlan !== "free" &&
@@ -407,7 +432,8 @@ export default function PricingPage() {
           <div className="mb-8 text-center">
             <button
               onClick={() =>
-                (window.location.href = "/dashboard")
+                (window.location.href =
+                  "/dashboard")
               }
               className="mb-6 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50"
             >
@@ -427,6 +453,7 @@ export default function PricingPage() {
           {/* CURRENT PLAN */}
 
           <div className="mx-auto mb-10 max-w-4xl rounded-3xl border border-indigo-100 bg-white p-6 shadow-lg">
+
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
 
               <div>
@@ -461,7 +488,10 @@ export default function PricingPage() {
                   </p>
 
                   <p className="mt-1 font-bold capitalize text-slate-900">
-                    {subscriptionStatus || "Active"}
+                    {cancelAtPeriodEnd
+                      ? "Cancellation scheduled"
+                      : subscriptionStatus ||
+                        "Active"}
                   </p>
                 </div>
 
@@ -483,12 +513,39 @@ export default function PricingPage() {
               </div>
             </div>
 
+            {/* CANCELLATION STATUS */}
+
+            {hasPaidSubscription &&
+              cancelAtPeriodEnd && (
+                <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+
+                  <p className="text-sm font-semibold text-amber-900">
+                    Cancellation scheduled
+                  </p>
+
+                  <p className="mt-1 text-sm text-amber-800">
+                    Your {currentPlanDetails.name} plan
+                    will remain active until{" "}
+                    <strong>
+                      {renewalDate}
+                    </strong>
+                    . It will not renew after that
+                    date.
+                  </p>
+
+                </div>
+              )}
+
             {/* CANCEL SUBSCRIPTION */}
 
             {hasPaidSubscription &&
-              subscriptionStatus !== "cancelled" &&
-              subscriptionStatus !== "completed" && (
+              !cancelAtPeriodEnd &&
+              subscriptionStatus !==
+                "cancelled" &&
+              subscriptionStatus !==
+                "completed" && (
                 <div className="mt-6 border-t border-slate-100 pt-6">
+
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
                     <div>
@@ -498,13 +555,15 @@ export default function PricingPage() {
 
                       <p className="mt-1 text-xs text-slate-500">
                         Canceling keeps your current
-                        storage active until the renewal
-                        date.
+                        storage active until the
+                        renewal date.
                       </p>
                     </div>
 
                     <button
-                      onClick={cancelSubscription}
+                      onClick={
+                        cancelSubscription
+                      }
                       disabled={cancelling}
                       className="rounded-xl border border-red-200 bg-white px-5 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -514,8 +573,10 @@ export default function PricingPage() {
                     </button>
 
                   </div>
+
                 </div>
               )}
+
           </div>
 
           {/* MESSAGE */}
@@ -534,7 +595,8 @@ export default function PricingPage() {
             </h2>
 
             <p className="mt-2 text-sm text-slate-500">
-              Upgrade whenever you need more storage.
+              Upgrade whenever you need more
+              storage.
             </p>
           </div>
 
@@ -579,7 +641,10 @@ export default function PricingPage() {
 
                   <div className="mt-6">
                     <span className="text-4xl font-bold text-slate-900">
-                      ₹{plan.price.toLocaleString("en-IN")}
+                      ₹
+                      {plan.price.toLocaleString(
+                        "en-IN"
+                      )}
                     </span>
 
                     <span className="ml-1 text-sm text-slate-500">
@@ -591,6 +656,7 @@ export default function PricingPage() {
 
                   <div className="mt-6 rounded-2xl bg-slate-50 p-4">
                     <div className="flex items-center justify-between">
+
                       <span className="text-sm text-slate-500">
                         Storage
                       </span>
@@ -598,6 +664,7 @@ export default function PricingPage() {
                       <span className="font-bold text-slate-900">
                         {plan.storage}
                       </span>
+
                     </div>
                   </div>
 
@@ -632,6 +699,7 @@ export default function PricingPage() {
                       Billed yearly
                     </p>
                   )}
+
                 </div>
               );
             })}
