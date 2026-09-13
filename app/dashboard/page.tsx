@@ -57,6 +57,9 @@ type PreviewFile = {
 const MAX_FILE_SIZE =
   5 * 1024 * 1024 * 1024;
 
+const FREE_STORAGE =
+  10 * 1024 * 1024 * 1024;
+
 function formatBytes(bytes: number) {
   if (!bytes || bytes <= 0) {
     return "0 B";
@@ -127,9 +130,7 @@ export default function Dashboard() {
     useState(0);
 
   const [storageLimit, setStorageLimit] =
-    useState(
-      30 * 1024 * 1024 * 1024
-    );
+    useState(FREE_STORAGE);
 
   const [selectedIds, setSelectedIds] =
     useState<string[]>([]);
@@ -235,10 +236,7 @@ export default function Dashboard() {
         setStorageLimit(
           Number(
             profile.storage_limit_bytes ||
-              30 *
-                1024 *
-                1024 *
-                1024
+              FREE_STORAGE
           )
         );
       }
@@ -255,6 +253,14 @@ export default function Dashboard() {
   useEffect(() => {
     loadFiles();
   }, []);
+
+  /* =========================================================
+     OPEN PRICING
+  ========================================================= */
+
+  const openPricing = () => {
+    window.location.href = "/pricing";
+  };
 
   /* =========================================================
      UPLOAD
@@ -337,16 +343,6 @@ export default function Dashboard() {
           );
         }
 
-        /*
-         * Get the signed upload URL.
-         *
-         * The current API returns:
-         * {
-         *   uploadUrl: "...",
-         *   storageKey: "..."
-         * }
-         */
-
         const uploadUrl =
           data.uploadUrl ||
           data.url ||
@@ -362,10 +358,6 @@ export default function Dashboard() {
             "Upload URL was not returned by the server."
           );
         }
-
-        /*
-         * Upload directly to Cloudflare R2.
-         */
 
         const uploadResponse =
           await fetch(uploadUrl, {
@@ -384,10 +376,6 @@ export default function Dashboard() {
           );
         }
 
-        /*
-         * The API returns storageKey.
-         */
-
         const storageKey =
           data.storageKey ||
           data.key ||
@@ -403,10 +391,6 @@ export default function Dashboard() {
             "Storage key was not returned by the server."
           );
         }
-
-        /*
-         * Save the file metadata in Supabase.
-         */
 
         const {
           error: dbError,
@@ -1270,6 +1254,7 @@ export default function Dashboard() {
         {/* SIDEBAR */}
 
         <aside className="hidden w-[250px] shrink-0 rounded-[30px] border border-white/60 bg-white/60 p-5 shadow-2xl backdrop-blur-xl md:flex md:flex-col">
+
           <div className="mb-8 flex items-center gap-3 px-2">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg">
               <Cloud size={24} />
@@ -1287,6 +1272,7 @@ export default function Dashboard() {
           </div>
 
           <nav className="space-y-2">
+
             <NavButton
               active={
                 section === "files"
@@ -1342,10 +1328,26 @@ export default function Dashboard() {
                 clearSelection();
               }}
             />
+
+            {/* PLANS & BILLING */}
+
+            <div className="pt-2">
+              <NavButton
+                active={false}
+                icon={
+                  <Sparkles size={19} />
+                }
+                label="Plans & Billing"
+                onClick={openPricing}
+              />
+            </div>
+
           </nav>
 
           <div className="mt-auto">
+
             <div className="rounded-3xl border border-white/70 bg-white/70 p-4 shadow-lg">
+
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm font-semibold text-slate-800">
                   Storage
@@ -1375,6 +1377,7 @@ export default function Dashboard() {
                   storageLimit
                 )}
               </p>
+
             </div>
 
             <button
@@ -1387,7 +1390,9 @@ export default function Dashboard() {
               />
               Sign out
             </button>
+
           </div>
+
         </aside>
 
         {/* MAIN */}
@@ -1397,7 +1402,9 @@ export default function Dashboard() {
           {/* HEADER */}
 
           <header className="mb-5 rounded-[30px] border border-white/60 bg-white/55 p-5 shadow-xl backdrop-blur-xl md:p-6">
+
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+
               <div>
                 <p className="mb-1 text-sm font-medium text-indigo-600">
                   Your private space
@@ -1414,6 +1421,7 @@ export default function Dashboard() {
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row">
+
                 <div className="relative">
                   <Search
                     size={18}
@@ -1455,13 +1463,17 @@ export default function Dashboard() {
                     handleFileInput
                   }
                 />
+
               </div>
+
             </div>
+
           </header>
 
           {/* MOBILE NAV */}
 
           <div className="mb-5 flex gap-2 overflow-x-auto md:hidden">
+
             {[
               ["files", "Files"],
               ["starred", "Starred"],
@@ -1487,11 +1499,20 @@ export default function Dashboard() {
                 </button>
               )
             )}
+
+            <button
+              onClick={openPricing}
+              className="whitespace-nowrap rounded-xl bg-white/70 px-4 py-2 text-sm font-semibold text-slate-600"
+            >
+              ✨ Plans
+            </button>
+
           </div>
 
           {/* STATS */}
 
           <div className="mb-5 grid gap-4 sm:grid-cols-3">
+
             <StatCard
               title="Total files"
               value={activeFiles.length.toString()}
@@ -1508,16 +1529,21 @@ export default function Dashboard() {
                 freeStorage
               )}
             />
+
           </div>
 
           {/* STORAGE + AI */}
 
           <div className="mb-5 grid gap-5 lg:grid-cols-2">
+
             <div className="relative overflow-hidden rounded-[30px] border border-white/60 bg-white/60 p-6 shadow-xl backdrop-blur-xl">
+
               <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-indigo-200/40 blur-3xl" />
 
               <div className="relative flex items-center gap-6">
+
                 <div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full bg-slate-100 shadow-inner">
+
                   <div
                     className="absolute inset-0 rounded-full"
                     style={{
@@ -1526,6 +1552,7 @@ export default function Dashboard() {
                   />
 
                   <div className="absolute inset-[9px] flex flex-col items-center justify-center rounded-full bg-white shadow-inner">
+
                     <span className="text-2xl font-bold text-slate-900">
                       {Math.round(
                         usedPercentage
@@ -1536,10 +1563,13 @@ export default function Dashboard() {
                     <span className="text-[10px] text-slate-500">
                       used
                     </span>
+
                   </div>
+
                 </div>
 
                 <div>
+
                   <p className="text-sm font-semibold text-indigo-600">
                     Storage
                   </p>
@@ -1556,18 +1586,24 @@ export default function Dashboard() {
                       storageLimit
                     )}
                   </p>
+
                 </div>
+
               </div>
+
             </div>
 
             <div className="relative overflow-hidden rounded-[30px] border border-indigo-200/50 bg-indigo-600 p-6 text-white shadow-xl">
+
               <Sparkles
                 className="absolute right-6 top-6 opacity-30"
                 size={35}
               />
 
               <div className="relative">
+
                 <div className="mb-3 flex items-center gap-2">
+
                   <ShieldCheck
                     size={18}
                   />
@@ -1575,6 +1611,7 @@ export default function Dashboard() {
                   <span className="text-sm font-semibold">
                     CloudX AI
                   </span>
+
                 </div>
 
                 <h3 className="text-xl font-bold">
@@ -1586,8 +1623,11 @@ export default function Dashboard() {
                   document understanding
                   are coming to CloudX.
                 </p>
+
               </div>
+
             </div>
+
           </div>
 
           {/* UPLOAD AREA */}
@@ -1602,6 +1642,7 @@ export default function Dashboard() {
             }
             className="mb-5 cursor-pointer rounded-[30px] border-2 border-dashed border-indigo-200 bg-indigo-50/50 p-7 text-center transition hover:border-indigo-400 hover:bg-indigo-50"
           >
+
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-lg">
               <Upload size={25} />
             </div>
@@ -1614,13 +1655,17 @@ export default function Dashboard() {
               or click to browse from your
               computer
             </p>
+
           </div>
 
           {/* FILE HEADER */}
 
           <div className="mb-3 flex items-center justify-between">
+
             <div>
+
               <h3 className="text-lg font-bold text-slate-900">
+
                 {section === "files" &&
                   "My Files"}
 
@@ -1632,6 +1677,7 @@ export default function Dashboard() {
 
                 {section === "trash" &&
                   "Trash"}
+
               </h3>
 
               <p className="text-sm text-slate-500">
@@ -1641,6 +1687,7 @@ export default function Dashboard() {
                   ? "s"
                   : ""}
               </p>
+
             </div>
 
             {visibleFiles.length >
@@ -1651,6 +1698,7 @@ export default function Dashboard() {
                 }
                 className="flex items-center gap-2 rounded-xl bg-white/70 px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm"
               >
+
                 {allVisibleSelected ? (
                   <CheckSquare
                     size={17}
@@ -1662,8 +1710,10 @@ export default function Dashboard() {
                 {allVisibleSelected
                   ? "Deselect all"
                   : "Select all"}
+
               </button>
             )}
+
           </div>
 
           {/* BULK ACTIONS */}
@@ -1671,12 +1721,14 @@ export default function Dashboard() {
           {selectedIds.length >
             0 && (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-3">
+
               <span className="text-sm font-semibold text-indigo-700">
                 {selectedIds.length}{" "}
                 selected
               </span>
 
               <div className="flex gap-2">
+
                 <button
                   onClick={
                     clearSelection
@@ -1706,13 +1758,16 @@ export default function Dashboard() {
                     Move to Trash
                   </button>
                 )}
+
               </div>
+
             </div>
           )}
 
           {/* FILE LIST */}
 
           <div className="space-y-3">
+
             {loading ? (
               <div className="rounded-[30px] bg-white/60 p-10 text-center shadow-lg">
                 <p className="text-sm text-slate-500">
@@ -1722,27 +1777,33 @@ export default function Dashboard() {
             ) : visibleFiles.length ===
               0 ? (
               <div className="rounded-[30px] border border-white/60 bg-white/60 p-12 text-center shadow-lg backdrop-blur-xl">
+
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
                   <Files size={28} />
                 </div>
 
                 <h3 className="mt-4 font-bold text-slate-900">
+
                   {search
                     ? "No files found"
                     : section ===
                         "trash"
                     ? "Trash is empty"
                     : "No files yet"}
+
                 </h3>
 
                 <p className="mt-1 text-sm text-slate-500">
+
                   {search
                     ? "Try another search."
                     : section ===
                         "trash"
                     ? "Deleted files will appear here."
                     : "Upload your first file to get started."}
+
                 </p>
+
               </div>
             ) : (
               visibleFiles.map(
@@ -1796,6 +1857,7 @@ export default function Dashboard() {
                             : "Select"
                         }
                       >
+
                         {selected ? (
                           <CheckSquare
                             size={20}
@@ -1806,11 +1868,13 @@ export default function Dashboard() {
                             size={20}
                           />
                         )}
+
                       </button>
 
                       {/* ICON */}
 
                       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white shadow-md">
+
                         <Icon
                           size={22}
                           className={
@@ -1819,11 +1883,13 @@ export default function Dashboard() {
                               : "text-slate-500"
                           }
                         />
+
                       </div>
 
                       {/* INFO */}
 
                       <div className="min-w-0 flex-1">
+
                         <p
                           className="truncate font-semibold text-slate-900"
                           title={
@@ -1834,6 +1900,7 @@ export default function Dashboard() {
                         </p>
 
                         <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
+
                           <span>
                             {file.size}
                           </span>
@@ -1847,7 +1914,9 @@ export default function Dashboard() {
                               file.createdAt
                             ).toLocaleDateString()}
                           </span>
+
                         </div>
+
                       </div>
 
                       {/* PREVIEW */}
@@ -1896,6 +1965,7 @@ export default function Dashboard() {
                       {/* MENU */}
 
                       <div className="relative z-40">
+
                         <button
                           onClick={() =>
                             setMenuId(
@@ -2035,16 +2105,22 @@ export default function Dashboard() {
                                 }
                               />
                             )}
+
                           </div>
                         )}
+
                       </div>
+
                     </div>
                   );
                 }
               )
             )}
+
           </div>
+
         </section>
+
       </div>
 
       {/* PREVIEW MODAL */}
@@ -2056,13 +2132,16 @@ export default function Dashboard() {
             setPreviewFile(null)
           }
         >
+
           <div
             className="relative flex max-h-[95vh] max-w-[95vw] flex-col overflow-hidden rounded-3xl bg-black shadow-2xl"
             onClick={(event) =>
               event.stopPropagation()
             }
           >
+
             <div className="flex items-center justify-between gap-4 bg-black/90 px-5 py-4 text-white">
+
               <p
                 className="truncate text-sm font-semibold"
                 title={
@@ -2080,6 +2159,7 @@ export default function Dashboard() {
               >
                 <X size={21} />
               </button>
+
             </div>
 
             {previewFile.mimeType.startsWith(
@@ -2111,7 +2191,9 @@ export default function Dashboard() {
                 </video>
               </div>
             )}
+
           </div>
+
         </div>
       )}
 
@@ -2124,13 +2206,16 @@ export default function Dashboard() {
             setRenameFile(null)
           }
         >
+
           <div
             className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
             onClick={(event) =>
               event.stopPropagation()
             }
           >
+
             <div className="mb-5 flex items-center justify-between">
+
               <h3 className="text-lg font-bold text-slate-900">
                 Rename file
               </h3>
@@ -2143,6 +2228,7 @@ export default function Dashboard() {
               >
                 <X size={19} />
               </button>
+
             </div>
 
             <input
@@ -2172,6 +2258,7 @@ export default function Dashboard() {
             />
 
             <div className="mt-5 flex justify-end gap-3">
+
               <button
                 onClick={() =>
                   setRenameFile(null)
@@ -2187,8 +2274,11 @@ export default function Dashboard() {
               >
                 Save
               </button>
+
             </div>
+
           </div>
+
         </div>
       )}
 
@@ -2203,6 +2293,7 @@ export default function Dashboard() {
           className="fixed inset-0 z-30 cursor-default"
         />
       )}
+
     </main>
   );
 }
@@ -2280,6 +2371,7 @@ function StatCard({
 }) {
   return (
     <div className="rounded-[25px] border border-white/60 bg-white/60 p-5 shadow-lg backdrop-blur-xl">
+
       <p className="text-sm text-slate-500">
         {title}
       </p>
@@ -2287,6 +2379,7 @@ function StatCard({
       <p className="mt-2 text-2xl font-bold text-slate-900">
         {value}
       </p>
+
     </div>
   );
 }
