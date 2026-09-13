@@ -1,0 +1,2 @@
+@import "tailwindcss";
+:root{--bg:#f7f8fc;--line:#e8eaf0;--accent:#4f46e5}*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif}button,input{font:inherit}.card{background:#fff;border:1px solid var(--line);border-radius:18px}.upload{border:2px dashed #d9dbe5;transition:.2s}.upload:hover{border-color:var(--accent);background:#fafaff}
