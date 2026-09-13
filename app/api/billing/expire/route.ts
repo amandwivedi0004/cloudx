@@ -5,14 +5,13 @@ const FREE_STORAGE_BYTES = 10 * 1024 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
-    const secret = request.headers.get("x-cloudx-cron-secret");
-   
+    const authHeader = request.headers.get("authorization");
+    const secret = authHeader?.replace("Bearer ", "");
 
-    
-if (
-  !process.env.CLOUDX_CRON_SECRET ||
-  secret !== process.env.CLOUDX_CRON_SECRET
-) {
+    if (
+      !process.env.CLOUDX_CRON_SECRET ||
+      secret !== process.env.CLOUDX_CRON_SECRET
+    ) {
       return NextResponse.json(
         { error: "Unauthorized." },
         { status: 401 }
